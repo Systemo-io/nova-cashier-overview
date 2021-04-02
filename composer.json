@@ -1,5 +1,5 @@
 {
-    "name": "tudor-gala/nova-cashier-overview",
+    "name": "systemo-io/nova-cashier-overview",
     "description": "Interact with your Stripe subscriptions directly inside Nova.",
     "keywords": [
         "laravel",
