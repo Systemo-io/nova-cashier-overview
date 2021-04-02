@@ -20,6 +20,12 @@ class StripeSubscriptionsController extends Controller
         /** @var \Laravel\Cashier\Subscription $subscription */
         $subscription = Subscription::find($subscriptionId);
 
+        try {
+            $planQuantity = $subscription->owner->getPlanQuantity();
+        } catch (\Throwable $e) {
+            // skip
+        }
+
         if (! $subscription) {
             return [
                 'subscription' => null,
@@ -28,7 +34,7 @@ class StripeSubscriptionsController extends Controller
 
         return [
             'subscription' => $this->formatSubscription($subscription),
-            'plans' => $this->formatPlans(Plan::all(['limit' => 100])),
+            'plans' => $this->formatPlans(Plan::all(['limit' => 100]), $planQuantity ?? null),
             'invoices' => $this->formatInvoices($subscription->owner->invoicesIncludingPending()),
         ];
     }
@@ -114,20 +120,51 @@ class StripeSubscriptionsController extends Controller
     /**
      * Format the plans collection.
      *
-     * @param  \Stripe\Collection $plans
+     * @param \Stripe\Collection $plans
+     * @param int|null           $planQuantity
      * @return array
      */
-    protected function formatPlans($plans)
+    protected function formatPlans($plans, ?int $planQuantity = null)
     {
-        return collect($plans->data)->map(function (Plan $plan) {
+        return collect($plans->data)->map(function (Plan $plan) use ($planQuantity) {
+            if ($plan->billing_scheme === 'tiered' && $planQuantity) {
+                $tiers = collect($plan->tiers)
+                    ->map(fn ($item) => $item->toArray())
+                    ->toArray();
+
+                $price = $this->getTierPrice($tiers, $planQuantity);
+            }
+
             return [
                 'id' => $plan->id,
-                'price' => $plan->amount,
+                'price' => $price ?? $plan->amount,
                 'interval' => $plan->interval,
                 'currency' => $plan->currency,
                 'interval_count' => $plan->interval_count,
             ];
         })->toArray();
+    }
+
+    /**
+     * @param array $tiers
+     * @param int   $quantity
+     * @return int
+     */
+    protected function getTierPrice(array $tiers, int $quantity): int
+    {
+        foreach ($tiers as $tier) {
+            if (!empty($tier['up_to']) && $tier['up_to'] <= $quantity) {
+                if ($tier['flat_amount']) {
+                    return $tier['flat_amount'];
+                }
+
+                if ($tier['unit_price']) {
+                    return $tier['unit_price'] * $quantity;
+                }
+            }
+        }
+
+        return 0;
     }
 
     /**
@@ -147,6 +184,7 @@ class StripeSubscriptionsController extends Controller
                 'period_end' => $this->formatDate($invoice->period_end),
                 'link' => $invoice->hosted_invoice_url,
                 'subscription' => $invoice->subscription,
+                'status' => $invoice->status,
             ];
         })->toArray();
     }
