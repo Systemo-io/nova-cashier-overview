@@ -33,7 +33,7 @@ class StripeSubscriptionsController extends Controller
         }
 
         return [
-            'subscription' => $this->formatSubscription($subscription),
+            'subscription' => $this->formatSubscription($subscription, $planQuantity ?? null),
             'plans' => $this->formatPlans(Plan::all(['limit' => 100]), $planQuantity ?? null),
             'invoices' => $this->formatInvoices($subscription->owner->invoicesIncludingPending()),
         ];
@@ -91,12 +91,16 @@ class StripeSubscriptionsController extends Controller
      * @return array
      * @throws \Stripe\Exception\ApiErrorException
      */
-    protected function formatSubscription(Subscription $subscription)
+    protected function formatSubscription(Subscription $subscription, ?int $planQuantity = null)
     {
         $stripeSubscription = StripeSubscription::retrieve($subscription->stripe_id);
 
+        if ($stripeSubscription->plan->billing_scheme === 'tiered' && $planQuantity) {
+            $planAmount = $this->getTierPrice($stripeSubscription->plan, $planQuantity);
+        }
+
         return array_merge($subscription->toArray(), [
-            'plan_amount' => $stripeSubscription->plan->amount,
+            'plan_amount' => $planAmount ?? $stripeSubscription->plan->amount,
             'plan_interval' => $stripeSubscription->plan->interval,
             'plan_currency' => $stripeSubscription->plan->currency,
             'plan' => $subscription->stripe_plan,
@@ -128,11 +132,7 @@ class StripeSubscriptionsController extends Controller
     {
         return collect($plans->data)->map(function (Plan $plan) use ($planQuantity) {
             if ($plan->billing_scheme === 'tiered' && $planQuantity) {
-                $tiers = collect($plan->tiers)
-                    ->map(fn ($item) => $item->toArray())
-                    ->toArray();
-
-                $price = $this->getTierPrice($tiers, $planQuantity);
+                $price = $this->getTierPrice($plan, $planQuantity);
             }
 
             return [
@@ -150,8 +150,12 @@ class StripeSubscriptionsController extends Controller
      * @param int   $quantity
      * @return int
      */
-    protected function getTierPrice(array $tiers, int $quantity): int
+    protected function getTierPrice(Plan $plan, int $quantity): int
     {
+        $tiers = collect($plan->tiers)
+            ->map(fn ($item) => $item->toArray())
+            ->toArray();
+
         foreach ($tiers as $tier) {
             if (!empty($tier['up_to']) && $tier['up_to'] <= $quantity) {
                 if ($tier['flat_amount']) {
