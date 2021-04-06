@@ -109,7 +109,7 @@ export default {
           this.fetchStripeSubscription();
         })
         .catch(err => {
-          this.$toasted.show(err.response.data.message, { type: 'error' });
+          this.$toasted.show(err.response.data.message, { type: 'error', duration: 1000 * 60 * 5 });
         });
     },
 
@@ -126,7 +126,7 @@ export default {
           this.fetchStripeSubscription();
         })
         .catch(err => {
-          this.$toasted.show(err.response.data.message, { type: 'error' });
+          this.$toasted.show(err.response.data.message, { type: 'error', duration: 1000 * 60 * 5 });
         });
     },
 
@@ -143,7 +143,7 @@ export default {
           this.fetchStripeSubscription();
         })
         .catch(err => {
-          this.$toasted.show(err.response.data.message, { type: 'error' });
+          this.$toasted.show(err.response.data.message, { type: 'error', duration: 1000 * 60 * 5 });
         });
     },
   },
