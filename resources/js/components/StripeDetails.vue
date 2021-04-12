@@ -31,7 +31,7 @@
       </display-row>
 
       <display-row
-        v-if="subscription"
+        v-if="subscription && subscription.active && !subscription.cancel_at_period_end"
         label="Change plan">
         <select
           v-model="newPlan"
