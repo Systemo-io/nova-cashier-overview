@@ -90,6 +90,7 @@
           "
         >Active</span
         >
+        <span v-if="subscription.stripe_status === 'past_due'" class="text-warning">Past due</span>
 
         <button
           v-if="
