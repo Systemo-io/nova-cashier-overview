@@ -31,7 +31,7 @@
       </display-row>
 
       <display-row
-        v-if="subscription && subscription.active && !subscription.cancel_at_period_end"
+        v-if="subscription && (subscription.active || subscription.stripe_status === 'past_due') && !subscription.cancel_at_period_end"
         label="Change plan">
         <select
           v-model="newPlan"
@@ -49,12 +49,7 @@
         </select>
 
         <button
-          v-if="
-            newPlan &&
-              newPlan != subscription.stripe_plan &&
-              subscription.active &&
-              !subscription.cancel_at_period_end
-          "
+          v-if="newPlan && newPlan != subscription.stripe_plan"
           class="btn btn-sm btn-outline"
           @click="$emit('update-plan', newPlan)"
         >
@@ -94,7 +89,7 @@
 
         <button
           v-if="
-            subscription.active && !subscription.cancelled && !subscription.cancel_at_period_end
+            (subscription.stripe_status === 'past_due' || subscription.active) && !subscription.cancelled && !subscription.cancel_at_period_end
           "
           class="btn btn-sm btn-outline ml-4"
           @click="$emit('cancel-subscription')"
