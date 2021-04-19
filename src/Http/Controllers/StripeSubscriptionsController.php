@@ -5,6 +5,7 @@ namespace LimeDeck\NovaCashierOverview\Http\Controllers;
 use Illuminate\Http\Response;
 use Illuminate\Support\Carbon;
 use Laravel\Cashier\Subscription;
+use Laravel\Cashier\Exceptions\PaymentFailure;
 use Stripe\Plan;
 use Stripe\Subscription as StripeSubscription;
 
@@ -49,7 +50,14 @@ class StripeSubscriptionsController extends Controller
         /** @var \Laravel\Cashier\Subscription $subscription */
         $subscription = Subscription::findOrFail($subscriptionId);
 
-        $subscription->swap($this->request->input('plan'));
+        try {
+            $oldPlan = $subscription->stripe_plan;
+            $subscription->swap($this->request->input('plan'));
+        } catch (PaymentFailure $e) {
+            $subscription->swap($oldPlan);
+
+            throw new \Exception('Card could not be charged, reverting to old plan');
+        }
 
         return response()->json([], Response::HTTP_NO_CONTENT);
     }
